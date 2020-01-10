@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+
+import datetime
+import json
+import RPi.GPIO as GPIO
+from Laser import Laser
+import time
+
+default_configuration = '{"run_time": 45, "min_movement": 12, "x_min": 0.1, "x_max": 90, "y_min": 0.1, "y_max": 22}'
+GPIO_BUTTON = 26
+laser = Laser()
+
+configuration = None
+config = json.loads(default_configuration)
+run_time = config.get('run_time')
+start_time = datetime.datetime.now()
+end_time = start_time + datetime.timedelta(seconds=run_time)
+
+def __button_handler(channel):
+    print('Button pressed! '.format(str(channel)))
+
+    global engage
+    engage = True
+
+    if engage:
+        print('Already firing the laser, button press ignored')
+    else:
+        print('Initiating Firing Sequence!')
+        # only start a new firing sequence if we're not already in the middle of one.
+        engage = True
+        __calibrate_laser()
+
+def __run_time_elapsed():
+    now = datetime.datetime.now()
+    # figure out if the laser has ran its course, and should be stopped.
+    if now.time() > end_time.time():
+        return True
+
+def __calibrate_laser():
+
+    global configuration
+
+    if configuration is None:
+        # no user defined config, so we'll go with the defaults
+        configuration = json.loads(default_configuration)
+
+    min_movement = configuration.get('min_movement')
+    x_max = configuration.get('x_max')
+    x_min = configuration.get('x_min')
+    y_max = configuration.get('y_max')
+    y_min = configuration.get('y_min')
+
+    laser.calibrate_laser(min_movement, x_min, x_max, y_min, y_max)
+
+def initiateLaserSequence():
+    # setup the push button GPIO pins
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(GPIO_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    global configuration
+
+    if configuration is None:
+        # no user defined config, so we'll go with the defaults
+        configuration = json.loads(default_configuration)
+
+    global engage
+    global start_time
+
+    run = True
+    engage = True
+
+    now = datetime.datetime.now()
+
+    # wire up a button press event handler to avoid missing a button click while the loop below
+    # is busy processing something else.
+    GPIO.add_event_detect(GPIO_BUTTON, GPIO.FALLING, callback=__button_handler, bouncetime=200)
+
+    #__calibrate_laser()
+    print("running, press CTRL+C to exit...")
+
+    try:
+        while run:
+            try:
+                if engage:
+                    if __run_time_elapsed():
+                        # we ran out of time for this run, shutdown the laser
+                        print("Time is up.")
+                        engage = False
+                        laser.stop()
+                    else:
+                        #print("Starting Laser at {0}".format(datetime.datetime.now()))
+                        laser.fire(run_time, configuration.get("min_movement"))
+                else:
+                    # sleep here to lessen the CPU impact of our infinite loop
+                    # while we're not busy shooting the laser. Without this, the CPU would
+                    # be eaten up and potentially lock the Pi.
+                    time.sleep(1)
+
+            except Exception as e:
+                print(e)
+                # swallowing exceptions isn't cool, but here we provide an opportunity to
+                # print the exception to an output log, should crontab be configured this way
+                # for debugging.
+                # print('Unhandled exception: {0}'.format(str(e)))
+            except KeyboardInterrupt:
+                print('KeyboardInterrupt: user quit the script.')
+                break
+    finally:
+        laser.stop()
+        GPIO.cleanup()
+
+if __name__ == '__main__':
+    initiateLaserSequence()
