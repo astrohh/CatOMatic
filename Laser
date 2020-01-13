@@ -1,33 +1,32 @@
-#!/usr/bin/env python
-
 import time
 import RPi.GPIO as GPIO
 import random
 import datetime
 
-DEFAULT_RUN_TIME = 90 #in seconds
+DEFAULT_RUN_TIME = 90  # in seconds
 DEFAULT_MIN_MOVEMENT = 5
 DEFAULT_X_MIN_POSITION = 25
 DEFAULT_X_MAX_POSITION = 50
 DEFAULT_Y_MIN_POSITION = 10
 DEFAULT_Y_MAX_POSITION = 25
 
-#The middle of our plane
-x_start = (DEFAULT_X_MIN_POSITION+DEFAULT_X_MAX_POSITION)/2
-y_start = (DEFAULT_Y_MIN_POSITION+DEFAULT_Y_MAX_POSITION)/2
+# The middle of our plane
+x_start = (DEFAULT_X_MIN_POSITION + DEFAULT_X_MAX_POSITION) / 2
+y_start = (DEFAULT_Y_MIN_POSITION + DEFAULT_Y_MAX_POSITION) / 2
 
 # define which GPIO pins to use for the servos and laser
 GPIO_X_SERVO = 4
 GPIO_Y_SERVO = 17
 GPIO_LASER = 27
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(GPIO_X_SERVO, GPIO.OUT)
+GPIO.setup(GPIO_Y_SERVO, GPIO.OUT)
+GPIO.setup(GPIO_LASER, GPIO.OUT)
+x_servo = GPIO.PWM(GPIO_X_SERVO, 50)
+y_servo = GPIO.PWM(GPIO_Y_SERVO, 50)
+
 
 class Laser:
-    def __init__(self):
-        GPIO.setmode(GPIO.BCM)
-
-        GPIO.setup(GPIO_X_SERVO, GPIO.OUT)
-        GPIO.setup(GPIO_Y_SERVO, GPIO.OUT)
-        GPIO.setup(GPIO_LASER, GPIO.OUT)
 
     def calibrate_laser(self, min_movement, x_min, x_max, y_min, y_max):
         # set config variables, using the defaults if one wasn't provided
@@ -43,8 +42,6 @@ class Laser:
 
         # turn on the laser and configure the servos
         GPIO.output(GPIO_LASER, 1)
-        x_servo = GPIO.PWM(GPIO_X_SERVO, 50)
-        y_servo = GPIO.PWM(GPIO_Y_SERVO, 50)
 
         # start the servo which initializes it, and positions them center on the cartesian plane
         x_servo.start(self.__get_position(self.x_position))
@@ -54,47 +51,46 @@ class Laser:
         time.sleep(1)
 
     def fire(self, movement_time, min_movement):
-
         GPIO.output(GPIO_LASER, 1)
         self.min_movement = DEFAULT_MIN_MOVEMENT if min_movement is None else min_movement
         self.movement_time = DEFAULT_RUN_TIME if movement_time is None else movement_time
-        self.x_min = DEFAULT_X_MIN_POSITION
-        self.x_max = DEFAULT_X_MAX_POSITION
-        self.y_min = DEFAULT_Y_MIN_POSITION
-        self.y_max = DEFAULT_Y_MAX_POSITION
+        self.x_min = DEFAULT_X_MIN_POSITION if x_min is None else x_min
+        self.x_max = DEFAULT_X_MAX_POSITION if x_max is None else x_max
+        self.y_min = DEFAULT_Y_MIN_POSITION if y_min is None else y_min
+        self.y_max = DEFAULT_Y_MAX_POSITION if y_max is None else y_max
         self.x_position = x_start
         self.y_position = y_start
-        self.x_servo = GPIO.setup(GPIO_X_SERVO, GPIO.OUT)
-        self.y_servo = GPIO.setup(GPIO_Y_SERVO, GPIO.OUT)
+        x_servo = GPIO.setup(GPIO_X_SERVO, GPIO.OUT)
+        y_servo = GPIO.setup(GPIO_Y_SERVO, GPIO.OUT)
 
-        #print("Movement time: {0}".format(self.movement_time))
+        # print("Movement time: {0}".format(self.movement_time))
 
         # how many steps (how long) should we take to get from old to new position
         self.x_incrementer = self.__get_position_incrementer(self.x_position, self.x_min, self.x_max, self.min_movement)
         self.y_incrementer = self.__get_position_incrementer(self.y_position, self.y_min, self.y_max, self.min_movement)
 
-        #this bit determines how long it takes to move to the next position
+        # this bit determines how long it takes to move to the next position
         for index in range(int(self.movement_time)):
             self.x_position += self.x_incrementer
             self.y_position += self.y_incrementer
-            self.__set_servo_position(self.x_servo, self.x_position)
-            self.__set_servo_position(self.y_servo, self.y_position)
+            self.__set_servo_position(x_servo, self.x_position)
+            self.__set_servo_position(y_servo, self.y_position)
             # leave the laser still so the cat has a chance to catch up
             print("Current position: X: {0} degrees, Y: {1} degrees".format(self.x_position, self.y_position))
             time.sleep(self.__get_movement_delay())
 
     def stop(self):
-        #always cleanup after ourselves
+        # always cleanup after ourselves
         print("Tidying up")
-        if self.x_servo is not None:
-            self.x_servo.stop()
-        if self.y_servo is not None:
-            self.y_servo.stop()
+        if x_servo is not None:
+            x_servo.stop()
+        if y_servo is not None:
+            y_servo.stop()
         GPIO.output(GPIO_LASER, 0)
         print("Ending execution at {0}".format(datetime.datetime.now()))
 
     def __set_servo_position(self, servo, position):
-        #servo.ChangeDutyCycle(self.__get_position(position))
+        x_servo.ChangeDutyCycle(self.__get_position(position))
         print('move')
 
     def __get_position(self, angle):
@@ -103,7 +99,7 @@ class Laser:
     def __get_position_incrementer(self, position, min, max, min_movement):
         self.min_movement = min_movement
         # randomly pick new position, leaving a buffer +- the min values for adjustment later
-        newPosition = random.uniform(min + self.min_movement, max - self.min_movement) #* random.randint(-1, 1)
+        newPosition = random.uniform(min + self.min_movement, max - self.min_movement)  # * random.randint(-1, 1)
 
         # bump up the new position if we didn't move more than our minimum requirement
         if ((newPosition > position) and (abs(newPosition - position) < self.min_movement)):
@@ -111,20 +107,11 @@ class Laser:
         elif ((newPosition < position) and (abs(newPosition - position) < self.min_movement)):
             newPosition -= self.min_movement
 
-        if newPosition < min:
-            newPosition = min
-        elif newPosition > max:
-            newPosition = max
-
         # return the number of steps, or incrementer, we should take to get to the new position
         # this is a convenient way to slow the movement down, rather than seeing very rapid movements
         # from point A to point B
-        return float((newPosition - position) / self.movement_time)
+        return float(abs(newPosition - position) / self.movement_time)
 
     def __get_movement_delay(self):
         return float(random.uniform(0, 1))
 
-    #All this does is returns a random integer for the amount of time the laser should run
-    #def __get_movement_time(self):
-        #return float(random.randint(10, 40))
-    #I think this is actually junk code since this is addressed in the wrapper
