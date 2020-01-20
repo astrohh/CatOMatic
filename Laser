@@ -25,16 +25,21 @@ GPIO.setup(GPIO_LASER, GPIO.OUT)
 x_servo = GPIO.PWM(GPIO_X_SERVO, 50)
 y_servo = GPIO.PWM(GPIO_Y_SERVO, 50)
 
+#setting these so that they're present for later
+x_min = 1
+x_max = 1
+y_min = 1
+y_max = 1
 
 class Laser:
 
     def calibrate_laser(self, min_movement, x_min, x_max, y_min, y_max):
         # set config variables, using the defaults if one wasn't provided
-        self.min_movement = DEFAULT_MIN_MOVEMENT if min_movement is None else min_movement
-        self.x_min = DEFAULT_X_MIN_POSITION if x_min is None else x_min
-        self.x_max = DEFAULT_X_MAX_POSITION if x_max is None else x_max
-        self.y_min = DEFAULT_Y_MIN_POSITION if y_min is None else y_min
-        self.y_max = DEFAULT_Y_MAX_POSITION if y_max is None else y_max
+        min_movement = DEFAULT_MIN_MOVEMENT if min_movement is None else min_movement
+        x_min = DEFAULT_X_MIN_POSITION if x_min is None else x_min
+        x_max = DEFAULT_X_MAX_POSITION if x_max is None else x_max
+        y_min = DEFAULT_Y_MIN_POSITION if y_min is None else y_min
+        y_max = DEFAULT_Y_MAX_POSITION if y_max is None else y_max
 
         # start at the center of our square/ rectangle.
         self.x_position = (self.x_max - self.x_min) / 2
