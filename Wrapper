@@ -8,17 +8,11 @@ default_configuration = '{"run_time": 5, "min_movement": 12, "x_min": 0.1, "x_ma
 GPIO_BUTTON = 26
 laser = Laser()
 
-engage = False
-run = True
-configuration = None
 config = json.loads(default_configuration)
 run_time = config.get('run_time')
-start_time = datetime.datetime.now()
-end_time = start_time + datetime.timedelta(seconds=run_time)
-
 
 def __button_handler(channel):
-    print('Button pressed! '.format(str(channel)))
+    print('button has been pressed...')
 
     global engage
 
@@ -60,18 +54,12 @@ def __calibrate_laser():
 
 def initiateLaserSequence():
     # setup the push button GPIO pins
-    GPIO.setmode(GPIO.BCM)
+    GPIO.setmode(GPIO.BOARD)
     GPIO.setup(GPIO_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-    global configuration
 
     if configuration is None:
         # no user defined config, so we'll go with the defaults
         configuration = json.loads(default_configuration)
-
-    global engage
-    global start_time
-    global end_time
 
     # wire up a button press event handler to avoid missing a button click while the loop below
     # is busy processing something else.
