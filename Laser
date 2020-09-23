@@ -3,12 +3,14 @@ import RPi.GPIO as GPIO
 import random
 import datetime
 
-DEFAULT_RUN_TIME = 90  # in seconds
-DEFAULT_MIN_MOVEMENT = 5
-DEFAULT_X_MIN_POSITION = 25
-DEFAULT_X_MAX_POSITION = 50
-DEFAULT_Y_MIN_POSITION = 10
-DEFAULT_Y_MAX_POSITION = 25
+GPIO.setwarnings(False)
+
+DEFAULT_RUN_TIME = 90  #in seconds
+DEFAULT_MIN_MOVEMENT = 3 
+DEFAULT_X_MIN_POSITION = 324
+DEFAULT_X_MAX_POSITION = 2844
+DEFAULT_Y_MIN_POSITION = 144
+DEFAULT_Y_MAX_POSITION = 1500
 
 # The middle of our plane
 x_start = (DEFAULT_X_MIN_POSITION + DEFAULT_X_MAX_POSITION) / 2
@@ -18,18 +20,14 @@ y_start = (DEFAULT_Y_MIN_POSITION + DEFAULT_Y_MAX_POSITION) / 2
 GPIO_X_SERVO = 4
 GPIO_Y_SERVO = 17
 GPIO_LASER = 27
-GPIO.setmode(GPIO.BCM)
+GPIO.setmode(GPIO.BOARD)
 GPIO.setup(GPIO_X_SERVO, GPIO.OUT)
 GPIO.setup(GPIO_Y_SERVO, GPIO.OUT)
 GPIO.setup(GPIO_LASER, GPIO.OUT)
 x_servo = GPIO.PWM(GPIO_X_SERVO, 50)
 y_servo = GPIO.PWM(GPIO_Y_SERVO, 50)
-
-#setting these so that they're present for later
-x_min = 1
-x_max = 1
-y_min = 1
-y_max = 1
+x_servo.start(0)
+y_servo.start(0)
 
 class Laser:
 
@@ -44,9 +42,6 @@ class Laser:
         # start at the center of our square/ rectangle.
         self.x_position = (self.x_max - self.x_min) / 2
         self.y_position = (self.y_max - self.y_min) / 2
-
-        # turn on the laser and configure the servos
-        GPIO.output(GPIO_LASER, 1)
 
         # start the servo which initializes it, and positions them center on the cartesian plane
         x_servo.start(self.__get_position(self.x_position))
@@ -68,7 +63,7 @@ class Laser:
         x_servo = GPIO.setup(GPIO_X_SERVO, GPIO.OUT)
         y_servo = GPIO.setup(GPIO_Y_SERVO, GPIO.OUT)
 
-        # print("Movement time: {0}".format(self.movement_time))
+        # print(f"Movement time: {self.movement_time}")
 
         # how many steps (how long) should we take to get from old to new position
         self.x_incrementer = self.__get_position_incrementer(self.x_position, self.x_min, self.x_max, self.min_movement)
@@ -99,17 +94,16 @@ class Laser:
         print('move')
 
     def __get_position(self, angle):
-        return (angle / 18.0) + 2.5
+        return (angle / 18.0) + 2
 
     def __get_position_incrementer(self, position, min, max, min_movement):
-        self.min_movement = min_movement
         # randomly pick new position, leaving a buffer +- the min values for adjustment later
         newPosition = random.uniform(min + self.min_movement, max - self.min_movement)  # * random.randint(-1, 1)
 
         # bump up the new position if we didn't move more than our minimum requirement
-        if ((newPosition > position) and (abs(newPosition - position) < self.min_movement)):
+        if newPosition > position and (abs(newPosition - position)) < self.min_movement:
             newPosition += self.min_movement
-        elif ((newPosition < position) and (abs(newPosition - position) < self.min_movement)):
+        else newPosition < position and (abs(newPosition - position)) < self.min_movement:
             newPosition -= self.min_movement
 
         # return the number of steps, or incrementer, we should take to get to the new position
